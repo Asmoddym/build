@@ -6,13 +6,11 @@ module Options
 	DEFAULT_CMAKE_LOCATION = "."
 	DEFAULT_MUTE = false
 	OPTIONS = {
-		["--clean", "-c"] => ["cleanDirectoryBeforeBuild", false, "Cleans the building directory before build (default: #{DEFAULT_CLEAN})"],
-		["-b", "--build-dir"] => ["setBuildDirectory", true, "Defines the building directory (default: \"#{DEFAULT_BUILD_DIR}\")"],
+		["-c", "--clean"] => ["cleanDirectory", true, "Cleans the building directory [before, after, both] build (default: #{DEFAULT_CLEAN})"],		["-b", "--build-dir"] => ["setBuildDirectory", true, "Defines the building directory (default: \"#{DEFAULT_BUILD_DIR}\")"],
 		["-f", "--cmakelists"] => ["setCMakeListsLocation", true, "Defines the CMakeLists.txt directory location (default: \"#{DEFAULT_CMAKE_LOCATION}\")"],
-		["-m", "--mute"] => ["muteCMakeLog", false, "Mutes the cmake command logs (default: #{DEFAULT_MUTE})"],
+		["-m", "--mute"] => ["muteCMakeLog", false, "Mutes the cmake and make command logs (default: #{DEFAULT_MUTE})"],
 		["--help", "-h"] => ["displayHelp", false, "Displays help"],
 	}
-
 
 	def isOption(arg)
 		arg.slice(0...1) == "-" || arg.slice(0...2) == "--"
@@ -58,8 +56,8 @@ class Commands
 		}
 	end
 
-	def cleanDirectoryBeforeBuild(arg)
-		@build_options[:clean] = !@clean
+	def cleanDirectory(arg)
+		@build_options[:clean] = arg
 		true
 	end
 
@@ -111,7 +109,7 @@ class Builder
 			return false
 		end
 
-		if build_options[:clean] == true
+		if build_options[:clean] == "before" || build_options[:clean] == "both"
 			Log.log "Cleaning build directory \"#{build_options[:build_dir]}\""
 			if command("rm -rf #{build_options[:build_dir]}", true) == false
 				Log.error "Could not clean the build directory \"#{build_options[:build_dir]}\""
@@ -124,6 +122,19 @@ class Builder
 		if command("cmake -B#{build_options[:build_dir]} -H#{build_options[:cmake_location]} #{formatted}", build_options[:mute]) == false
 			Log.error "Could not perform cmake on the project."
 			return false
+		end
+
+		if command("make -C #{build_options[:build_dir]}", build_options[:mute]) == false
+			Log.error "Something happened while performing make on the project."
+			return false
+		end
+
+		if build_options[:clean] == "after" || build_options[:clean] == "both"
+			Log.log "Cleaning build directory \"#{build_options[:build_dir]}\""
+			if command("rm -rf #{build_options[:build_dir]}", true) == false
+				Log.error "Could not clean the build directory \"#{build_options[:build_dir]}\""
+				return false
+			end
 		end
 
 		Log.log "Finished"
@@ -171,10 +182,8 @@ end
 args = Arguments.new
 
 if !args.parse
-	if args.error != 0
-		Help.display
-	end
-	exit args.error
+	Help.display
+	exit 1
 end
 
 exit args.build == false ? 1 : 0
