@@ -1,0 +1,163 @@
+#!/usr/bin/ruby
+
+module Options
+	DEFAULT_BUILD_DIR = ".build"
+	DEFAULT_CLEAN = false
+	DEFAULT_CMAKE = "."
+	DEFAULT_MUTE = false
+	OPTIONS = {
+		["--clean", "-c"] => ["cleanDirectoryBeforeBuild", false, "Cleans the building directory before build (default: #{DEFAULT_CLEAN})"],
+		["-b", "--build-dir"] => ["setBuildDirectory", true, "Defines the building directory (default: \"#{DEFAULT_BUILD_DIR}\")"],
+		["-f", "--cmakelists"] => ["setCMakeListsLocation", true, "Defines the CMakeLists.txt location (default: \"#{DEFAULT_CMAKE}\""],
+		["-m", "--mute"] => ["muteCMakeLog", false, "Mutes the cmake command logs (default: #{DEFAULT_MUTE})"],
+	}
+
+
+	def isOption(arg)
+		arg.slice(0...1) == "-" || arg.slice(0...2) == "--"
+	end
+
+	def takesParameter(option)
+		OPTIONS.each {|options, data|
+			return data[1] if options.include?(option)
+		}
+		false
+	end
+
+	def getMethod(option)
+		OPTIONS.each {|options, data|
+			return data[0] if options.include?(option)
+		}
+		nil
+	end
+end
+
+class Help
+	include Options
+	def self.display
+		puts "USAGE: #{__FILE__} [options...]"
+		puts
+		puts "OPTIONS (optional):"
+		OPTIONS.each { |options, data|
+			puts "  - #{options.to_s}: #{data[2]}"
+		}
+	end
+end
+
+class Commands
+	attr_reader :clean
+	attr_reader :build_dir
+	attr_reader :cmake_location
+	attr_reader :mute
+
+	def initialize
+		@clean = Options::DEFAULT_CLEAN
+		@build_dir = Options::DEFAULT_BUILD_DIR
+		@cmake_location = Options::DEFAULT_CMAKE
+		@mute = Options::DEFAULT_MUTE
+	end
+
+	def cleanDirectoryBeforeBuild(arg)
+		@clean = !@clean
+		true
+	end
+
+	def setBuildDirectory(arg)
+		@build_dir = arg
+		!@build_dir.nil?
+	end
+
+	def setCMakeListsLocation(arg)
+		@cmake_location = arg
+	end
+
+	def muteCMakeLog(arg)
+		@mute = !@mute
+	end
+end
+
+class Log
+	def self.log(msg)
+		puts "[  LOG  ] " << msg
+	end
+
+	def self.error(msg)
+		puts "[ ERROR ] " << msg
+	end
+end
+
+class Builder
+	def command(cmd, hide_output = false)
+		ret = system(hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd)
+		ret.nil? || ret == false ? false : true
+	end
+
+	def build(clean, build_dir, cmake_location, mute, build_options)
+		if command("test -f #{build_dir}", true)
+			Log.error "\"#{build_dir}\" is already a file and should not be defined as build directory."
+			return false
+		end
+
+		if clean == true
+			Log.log "Cleaning build directory \"#{build_dir}\""
+			if command("rm -rf #{build_dir}", true) == false
+				Log.error "Could not clean the build directory \"#{build_dir}\""
+				return false
+			end
+		end
+
+		formatted = formatBuildOptions build_options
+		Log.log "Performing cmake on project from \"#{cmake_location}/CMakeLists.txt\" to \"#{build_dir}\" with options \"#{formatted}\""
+		if command("cmake -B#{build_dir} -H#{cmake_location} #{formatted}", mute) == false
+			Log.error "Could not perform cmake on the project."
+			return false
+		end
+
+		Log.log "Finished"
+		true
+	end
+
+	def formatBuildOptions(opt)
+		formatted = ""
+		opt.each { |str| 
+			formatted += str
+			formatted += " "
+		}
+		formatted
+	end
+end
+
+class Arguments
+	include Options
+	def parse
+		@build_options = []
+		@takes_arg = false
+		@commands = Commands.new
+		for i in 0...ARGV.length
+			if @takes_arg
+				@takes_arg = false
+				next
+			elsif isOption(ARGV[i])
+				m = getMethod(ARGV[i])
+				return false if m.nil? or !@commands.respond_to? m
+				@takes_arg = takesParameter(ARGV[i])
+				return false if !@commands.send(m, takesParameter(ARGV[i]) ? ARGV[i + 1] : nil)
+			else
+				@build_options.push(ARGV[i])
+			end
+		end
+	end
+
+	def build
+		builder = Builder.new
+		builder.build(@commands.clean, @commands.build_dir, @commands.cmake_location, @commands.mute, @build_options)
+	end
+end
+
+args = Arguments.new
+
+if !args.parse
+	Help.display
+end
+
+exit args.build == false ? 1 : 0
