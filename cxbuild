@@ -6,7 +6,8 @@ module Options
 	DEFAULT_CMAKE_LOCATION = "."
 	DEFAULT_MUTE = false
 	OPTIONS = {
-		["-c", "--clean"] => ["cleanDirectory", true, "Cleans the building directory [before, after, both] build (default: #{DEFAULT_CLEAN})"],		["-b", "--build-dir"] => ["setBuildDirectory", true, "Defines the building directory (default: \"#{DEFAULT_BUILD_DIR}\")"],
+		["-c", "--clean"] => ["cleanDirectory", true, "Cleans the building directory [before, after, both] build (default: #{DEFAULT_CLEAN})"],
+		["-b", "--build-dir"] => ["setBuildDirectory", true, "Defines the building directory (default: \"#{DEFAULT_BUILD_DIR}\")"],
 		["-f", "--cmakelists"] => ["setCMakeListsLocation", true, "Defines the CMakeLists.txt directory location (default: \"#{DEFAULT_CMAKE_LOCATION}\")"],
 		["-m", "--mute"] => ["muteCMakeLog", false, "Mutes the cmake and make command logs (default: #{DEFAULT_MUTE})"],
 		["--help", "-h"] => ["displayHelp", false, "Displays help"],
@@ -66,7 +67,11 @@ class Commands
 	end
 
 	def cleanDirectory(arg)
-		@build_options[:clean] = arg
+		if arg == 'before' || arg == 'after' || arg == 'both'
+			@build_options[:clean] = arg
+		else
+			return false
+		end
 		true
 	end
 
@@ -118,9 +123,8 @@ end
 
 class Builder
 	def command(cmd, hide_output = false)
-		puts hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd
-		#ret = system(hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd)
-		#ret.nil? || ret == false ? false : true
+		ret = system(hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd)
+		ret.nil? || ret == false ? false : true
 	end
 
 	def build(build_options, cmake_options)
