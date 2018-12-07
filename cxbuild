@@ -10,10 +10,16 @@ module Options
 		["-f", "--cmakelists"] => ["setCMakeListsLocation", true, "Defines the CMakeLists.txt directory location (default: \"#{DEFAULT_CMAKE_LOCATION}\")"],
 		["-m", "--mute"] => ["muteCMakeLog", false, "Mutes the cmake and make command logs (default: #{DEFAULT_MUTE})"],
 		["--help", "-h"] => ["displayHelp", false, "Displays help"],
+		["-v", "--verbose"] => ["makeVerbose", false, "Enables make verbose mode"],
+		["-i", "--install"] => ["enableInstall", false, "Installs the built elements via cmake"],
+		["--no-sudo"] => ["installWithoutSudo", false, "Installs the built elements without using sudo (works only with --install)"],
 	}
 
 	def isOption(arg)
-		arg.slice(0...1) == "-" || arg.slice(0...2) == "--"
+		OPTIONS.each { |opts, data|
+			return true if opts.include?(arg)
+		}
+		false
 	end
 
 	def takesParameter(option)
@@ -53,6 +59,9 @@ class Commands
 			cmake_location: Options::DEFAULT_CMAKE_LOCATION,
 			mute: Options::DEFAULT_MUTE,
 			help: false,
+			verbose: false,
+			install: false,
+			sudo: true,
 		}
 	end
 
@@ -72,12 +81,27 @@ class Commands
 	end
 
 	def muteCMakeLog(arg)
-		@build_options[:mute] = !@mute
+		@build_options[:mute] = true
 		true
 	end
 
 	def displayHelp(arg)
 		@build_options[:help] = true
+		true
+	end
+
+	def makeVerbose(arg)
+		@build_options[:verbose] = true
+		true
+	end
+
+	def enableInstall(arg)
+		@build_options[:install] = true
+		true
+	end
+
+	def installWithoutSudo(arg)
+		@build_options[:sudo] = false
 		true
 	end
 end
@@ -94,8 +118,9 @@ end
 
 class Builder
 	def command(cmd, hide_output = false)
-		ret = system(hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd)
-		ret.nil? || ret == false ? false : true
+		puts hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd
+		#ret = system(hide_output ? (cmd << " &> /tmp/" << Time.now.to_i.to_s << ".build.log") : cmd)
+		#ret.nil? || ret == false ? false : true
 	end
 
 	def build(build_options, cmake_options)
@@ -124,9 +149,21 @@ class Builder
 			return false
 		end
 
-		if command("make -C #{build_options[:build_dir]}", build_options[:mute]) == false
+		if command("make -C #{build_options[:build_dir]}" << (build_options[:verbose] == true ? " VERBOSE=1" : ""), build_options[:mute]) == false
 			Log.error "Something happened while performing make on the project."
 			return false
+		end
+
+		if build_options[:install] == true
+			cmd = ""
+			if build_options[:sudo] == true
+				cmd = "sudo "
+			end
+			cmd += "make -C #{build_options[:build_dir]} install"
+			if command(cmd << (build_options[:verbose] == true ? " VERBOSE=1" : ""), build_options[:mute]) == false
+				Log.error "Something happened while performing make install on the project."
+				return false
+			end
 		end
 
 		if build_options[:clean] == "after" || build_options[:clean] == "both"
@@ -143,7 +180,7 @@ class Builder
 
 	def formatBuildOptions(opt)
 		formatted = ""
-		opt.each { |str| 
+		opt.each { |str|
 			formatted += str
 			formatted += " "
 		}
