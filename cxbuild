@@ -15,6 +15,7 @@ module Options
 		["-i", "--install"] => ["enableInstall", false, "Installs the built elements via cmake"],
 		["--no-sudo"] => ["installWithoutSudo", false, "Installs the built elements without using sudo (works only with --install)"],
                 ["--with-tests", "-t"] => ["buildTests", false, "Builds the tests at the ame time"],
+                ["--rules", "-r"] => ["setRules", true, "Sets the Make rules to call (default: all)"],
 	}
 
 	def isOption(arg)
@@ -65,6 +66,7 @@ class Commands
 			install: false,
 			sudo: true,
                         tests: false,
+                        rules: "all",
 		}
 	end
 
@@ -116,6 +118,11 @@ class Commands
           @build_options[:tests] = true
           true
         end
+
+        def setRules(arg)
+          @build_options[:rules] = arg
+          true
+        end
 end
 
 class Log
@@ -160,7 +167,7 @@ class Builder
 			return false
 		end
 
-		if command("make -C #{build_options[:build_dir]} all" << (build_options[:verbose] == true ? " VERBOSE=1" : "") << (build_options[:tests] == true ? " tests" : ""), build_options[:mute]) == false
+		if command("make -C #{build_options[:build_dir]} " << build_options[:rules] << (build_options[:verbose] == true ? " VERBOSE=1" : "") << (build_options[:tests] == true ? " tests" : ""), build_options[:mute]) == false
 			Log.error "Something happened while performing make on the project."
 			return false
 		end
