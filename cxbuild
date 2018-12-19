@@ -14,6 +14,7 @@ module Options
 		["-v", "--verbose"] => ["makeVerbose", false, "Enables make verbose mode"],
 		["-i", "--install"] => ["enableInstall", false, "Installs the built elements via cmake"],
 		["--no-sudo"] => ["installWithoutSudo", false, "Installs the built elements without using sudo (works only with --install)"],
+                ["--with-tests", "-t"] => ["buildTests", false, "Builds the tests at the ame time"],
 	}
 
 	def isOption(arg)
@@ -63,6 +64,7 @@ class Commands
 			verbose: false,
 			install: false,
 			sudo: true,
+                        tests: false,
 		}
 	end
 
@@ -109,6 +111,11 @@ class Commands
 		@build_options[:sudo] = false
 		true
 	end
+
+        def buildTests(arg)
+          @build_options[:tests] = true
+          true
+        end
 end
 
 class Log
@@ -153,7 +160,7 @@ class Builder
 			return false
 		end
 
-		if command("make -C #{build_options[:build_dir]}" << (build_options[:verbose] == true ? " VERBOSE=1" : ""), build_options[:mute]) == false
+		if command("make -C #{build_options[:build_dir]} all" << (build_options[:verbose] == true ? " VERBOSE=1" : "") << (build_options[:tests] == true ? " tests" : ""), build_options[:mute]) == false
 			Log.error "Something happened while performing make on the project."
 			return false
 		end
