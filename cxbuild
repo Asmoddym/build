@@ -16,6 +16,7 @@ module Options
 		["--no-sudo"] => ["installWithoutSudo", false, "Installs the built elements without using sudo (works only with --install)"],
                 ["--with-tests", "-t"] => ["buildTests", false, "Builds the tests at the ame time"],
                 ["--rules", "-r"] => ["setRules", true, "Sets the Make rules to call (default: all)"],
+                ["-j"] => ["makeJArg", true, "Enables the make -j flag (default: none)"],
 	}
 
 	def isOption(arg)
@@ -67,6 +68,7 @@ class Commands
 			sudo: true,
                         tests: false,
                         rules: "all",
+                        j: nil,
 		}
 	end
 
@@ -123,6 +125,10 @@ class Commands
           @build_options[:rules] = arg
           true
         end
+
+        def makeJArg(arg)
+          @build_options[:j] = arg
+        end
 end
 
 class Log
@@ -167,7 +173,7 @@ class Builder
 			return false
 		end
 
-		if command("make -C #{build_options[:build_dir]} " << build_options[:rules] << (build_options[:verbose] == true ? " VERBOSE=1" : "") << (build_options[:tests] == true ? " tests" : ""), build_options[:mute]) == false
+		if command("make -C #{build_options[:build_dir]}" << (!build_options[:j].nil? ? (" -j" + build_options[:j]) : "") << " " << build_options[:rules] << (build_options[:verbose] == true ? " VERBOSE=1" : "") << (build_options[:tests] == true ? " tests" : ""), build_options[:mute]) == false
 			Log.error "Something happened while performing make on the project."
 			return false
 		end
