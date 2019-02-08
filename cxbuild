@@ -17,6 +17,7 @@ module Options
                 ["--with-tests", "-t"] => ["buildTests", false, "Builds the tests at the ame time"],
                 ["--rules", "-r"] => ["setRules", true, "Sets the Make rules to call (default: all)"],
                 ["-j"] => ["makeJArg", true, "Enables the make -j flag (default: none)"],
+                ["-s"] => ["checkSubmodules", false, "Checks submodules, calls 'git submodule update --init --remote' if there is (default: false)"],
 	}
 
 	def isOption(arg)
@@ -69,6 +70,7 @@ class Commands
                         tests: false,
                         rules: "all",
                         j: nil,
+                        s: false,
 		}
 	end
 
@@ -129,6 +131,10 @@ class Commands
         def makeJArg(arg)
           @build_options[:j] = arg
         end
+
+        def checkSubmodules(arg)
+          @build_options[:s] = true
+        end
 end
 
 class Log
@@ -152,6 +158,10 @@ class Builder
 			Help.display
 			return true
 		end
+
+                if build_options[:s] && File.file?(".gitmodules")
+                  command("git submodule update --init --remote", build_options[:mute])
+                end
 
 		if command("test -f #{build_options[:build_dir]}", true)
 			Log.error "\"#{build_options[:build_dir]}\" is already a file and should not be defined as build directory."
