@@ -18,6 +18,7 @@ module Options
                 ["--rules", "-r"] => ["setRules", true, "Sets the Make rules to call (default: all)"],
                 ["-j"] => ["makeJArg", true, "Enables the make -j flag (default: none)"],
                 ["-s"] => ["checkSubmodules", false, "Checks submodules, calls 'git submodule update --init --remote' if there is (default: false)"],
+                ["-o"] => ["cmakeArgs", true, "Adds CMake arguments"]
 	}
 
 	def isOption(arg)
@@ -71,6 +72,7 @@ class Commands
                         rules: "all",
                         j: nil,
                         s: false,
+                        o: ""
 		}
 	end
 
@@ -82,6 +84,11 @@ class Commands
 		end
 		true
 	end
+
+        def cmakeArgs(arg)
+          @build_options[:o] = arg
+          true
+        end
 
 	def setBuildDirectory(arg)
 		@build_options[:build_dir] = arg
@@ -176,7 +183,7 @@ class Builder
 			end
 		end
 
-		formatted = formatBuildOptions cmake_options
+		formatted = formatBuildOptions(cmake_options) + (build_options[:o].split(" ").map { |s| "-D#{s}" }.join(" ") )
 		Log.log "Performing cmake on project from \"#{build_options[:cmake_location]}/CMakeLists.txt\" to \"#{build_options[:build_dir]}\" with options \"#{formatted}\""
 		if command("cmake -B#{build_options[:build_dir]} -H#{build_options[:cmake_location]} #{formatted}", build_options[:mute]) == false
 			Log.error "Could not perform cmake on the project."
